@@ -12,3 +12,11 @@ spring:
       hibernate:
         format_sql: true
         show_sql: true
+
+app:
+  s3:
+    endpoint: http://localhost:${MINIO_API_PORT}
+    region: ap-northeast-2
+    bucket: ${MINIO_BUCKET}
+    accessKey: ${MINIO_ROOT_USER}
+    secretKey: ${MINIO_ROOT_PASSWORD}
