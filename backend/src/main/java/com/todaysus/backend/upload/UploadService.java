@@ -16,7 +16,6 @@ import software.amazon.awssdk.services.s3.presigner.model.PresignedPutObjectRequ
 @Service
 @RequiredArgsConstructor
 public class UploadService {
-    private final long ADMIN_USER_ID = 0;
 
     private final S3Presigner presigner;
     private final S3Properties s3Props;
@@ -24,7 +23,7 @@ public class UploadService {
 
     @Transactional
     public PresignResponse initUpload(PresignRequest req) {
-        Photo photo = createPlaceholderPhoto(ADMIN_USER_ID); // TODO: 나중에 auth에서 userId 뽑기
+        Photo photo = createPlaceholderPhoto(1L); // TODO: 나중에 auth에서 userId 뽑기
         photo.setFilename(req.filename());
         photo.setContentType(req.contentType());
         String key = buildOriginalKey(photo.getUserId(), photo.getId());
