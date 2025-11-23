@@ -77,6 +77,8 @@ function App() {
         throw new Error(`Upload failed with status ${putResponse.status}`);
       }
 
+      await axios.post(`/api/upload/${data.photoId}/complete`);
+
       alert('업로드가 완료됐어요!');
       await fetchPhotos();
     } catch (error) {

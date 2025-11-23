@@ -32,13 +32,17 @@ public class PhotoService {
     }
 
     private String buildImageUrl(Photo photo) {
-        if (photo.getOriginalKey() == null) {
+        String key = photo.getThumbnailKey() != null
+                ? photo.getThumbnailKey()
+                : photo.getOriginalKey();
+
+        if (key == null) {
             return null;
         }
 
         GetObjectRequest getObjectRequest = GetObjectRequest.builder()
                 .bucket(s3Properties.getBucket())
-                .key(photo.getOriginalKey())
+                .key(key)
                 .build();
 
         return presigner.presignGetObject(builder -> builder

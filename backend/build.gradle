@@ -30,6 +30,7 @@ dependencies {
     implementation 'org.springframework.boot:spring-boot-starter-web'
     implementation platform("software.amazon.awssdk:bom:2.38.7")
     implementation 'software.amazon.awssdk:s3'
+    implementation 'net.coobird:thumbnailator:0.4.21'
     compileOnly 'org.projectlombok:lombok'
     runtimeOnly 'org.postgresql:postgresql'
     annotationProcessor 'org.projectlombok:lombok'

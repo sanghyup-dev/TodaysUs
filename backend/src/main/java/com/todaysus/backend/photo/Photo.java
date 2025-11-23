@@ -30,6 +30,8 @@ public class Photo {
 
     private String originalKey;
 
+    private String thumbnailKey;
+
     private String name;
 
     // TODO: 추후 latitude/longitude 필드 추가해서 지도 기능 연동 고려

@@ -3,6 +3,7 @@ package com.todaysus.backend.upload;
 import com.todaysus.backend.config.S3Properties;
 import com.todaysus.backend.photo.Photo;
 import com.todaysus.backend.photo.PhotoRepository;
+import com.todaysus.backend.photo.ThumbnailService;
 import com.todaysus.backend.upload.UploadController.PresignRequest;
 import com.todaysus.backend.upload.UploadController.PresignResponse;
 import jakarta.transaction.Transactional;
@@ -20,6 +21,7 @@ public class UploadService {
     private final S3Presigner presigner;
     private final S3Properties s3Props;
     private final PhotoRepository photoRepository;
+    private final ThumbnailService thumbnailService;
 
     @Transactional
     public PresignResponse initUpload(PresignRequest req) {
@@ -34,6 +36,11 @@ public class UploadService {
 
         return new PresignResponse(photo.getId(), key, presigned.url().toString());
 
+    }
+
+    @Transactional
+    public void handleUploadComplete(Long photoId) {
+        thumbnailService.generateThumbnailAsync(photoId);
     }
 
     private Photo createPlaceholderPhoto(Long userId) {
