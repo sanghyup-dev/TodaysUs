@@ -45,8 +45,12 @@ function App() {
   const [galleryError, setGalleryError] = useState<string | null>(null);
   const [isGalleryLoading, setIsGalleryLoading] = useState(true);
   const [selectedPhoto, setSelectedPhoto] = useState<Photo | null>(null);
+  const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [isDownloading, setIsDownloading] = useState(false);
+  const [nameInput, setNameInput] = useState('');
+  const [locationInput, setLocationInput] = useState('');
+  const [descriptionInput, setDescriptionInput] = useState('');
   const [zoom, setZoom] = useState(1);
   const [offset, setOffset] = useState({ x: 0, y: 0 });
   const [isPanning, setIsPanning] = useState(false);
@@ -83,6 +87,9 @@ function App() {
       const { data } = await axios.post<PresignResponse>('/api/upload/init', {
         filename: file.name,
         contentType,
+        name: nameInput || null,
+        location: locationInput || null,
+        description: descriptionInput || null,
       });
 
       const putResponse = await fetch(data.url, {
@@ -101,6 +108,10 @@ function App() {
 
       alert('업로드가 완료됐어요!');
       await fetchPhotos();
+      setNameInput('');
+      setLocationInput('');
+      setDescriptionInput('');
+      setIsUploadModalOpen(false);
     } catch (error) {
       console.error('Upload failed', error);
       alert('업로드에 실패했어요. 잠시 후 다시 시도해 주세요.');
@@ -295,7 +306,7 @@ function App() {
   }, [resetZoom, selectedPhoto]);
 
   useEffect(() => {
-    if (!selectedPhoto) {
+    if (!selectedPhoto && !isUploadModalOpen) {
       document.body.style.overflow = '';
       return;
     }
@@ -314,7 +325,7 @@ function App() {
       document.body.style.overflow = '';
       window.removeEventListener('wheel', handleGlobalWheel);
     };
-  }, [selectedPhoto]);
+  }, [isUploadModalOpen, selectedPhoto]);
 
   return (
     <main className="app">
@@ -322,19 +333,13 @@ function App() {
         <div className="hero-text">
           <p className="eyebrow">오늘의 우리</p>
           <h1>내 하루를 담은 사진 모음</h1>
-          <p className="subtitle">
-            추억을 업로드하면 자동으로 정리돼요. userId=1에 해당하는 모든 사진을 한눈에 모아볼 수 있어요.
-          </p>
+          <div className="upload-inline">
+            <span>사진 업로드 버튼을 눌러 메타데이터와 함께 업로드하세요.</span>
+            <button className="primary-button" type="button" onClick={() => setIsUploadModalOpen(true)}>
+              사진 업로드
+            </button>
+          </div>
         </div>
-        <label className={`file-input ${isUploading ? 'disabled' : ''}`}>
-          <span>{isUploading ? '업로드 중…' : '사진 업로드'}</span>
-          <input
-            type="file"
-            accept="image/*"
-            onChange={handleFileChange}
-            disabled={isUploading}
-          />
-        </label>
       </section>
 
       <section className="gallery-section">
@@ -425,6 +430,75 @@ function App() {
                   disabled={isDeleting}
                 >
                   {isDeleting ? '삭제 중…' : '삭제'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+      {isUploadModalOpen && (
+        <div className="modal-backdrop" onClick={() => !isUploading && setIsUploadModalOpen(false)}>
+          <div className="modal upload-modal" onClick={(event) => event.stopPropagation()}>
+            <button
+              className="close-button"
+              onClick={() => setIsUploadModalOpen(false)}
+              aria-label="닫기"
+              disabled={isUploading}
+            >
+              X
+            </button>
+            <div className="upload-modal-body">
+              <h3>새 사진 업로드</h3>
+              <p className="upload-helper">파일을 선택하면 즉시 업로드가 시작돼요.</p>
+              <div className="upload-fields">
+                <label className="field">
+                  <span>이름</span>
+                  <input
+                    type="text"
+                    value={nameInput}
+                    onChange={(e) => setNameInput(e.target.value)}
+                    placeholder="사진 이름을 입력하세요 (선택)"
+                    disabled={isUploading}
+                  />
+                </label>
+                <label className="field">
+                  <span>위치</span>
+                  <input
+                    type="text"
+                    value={locationInput}
+                    onChange={(e) => setLocationInput(e.target.value)}
+                    placeholder="어디서 찍었나요? (선택)"
+                    disabled={isUploading}
+                  />
+                </label>
+              </div>
+              <label className="field">
+                <span>설명</span>
+                <textarea
+                  value={descriptionInput}
+                  onChange={(e) => setDescriptionInput(e.target.value)}
+                  placeholder="간단한 설명을 적어보세요 (선택)"
+                  rows={3}
+                  disabled={isUploading}
+                />
+              </label>
+              <div className="upload-modal-actions">
+                <label className={`file-input ${isUploading ? 'disabled' : ''}`}>
+                  <span>{isUploading ? '업로드 중…' : '파일 선택 후 업로드'}</span>
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={handleFileChange}
+                    disabled={isUploading}
+                  />
+                </label>
+                <button
+                  className="ghost-button"
+                  type="button"
+                  onClick={() => setIsUploadModalOpen(false)}
+                  disabled={isUploading}
+                >
+                  닫기
                 </button>
               </div>
             </div>

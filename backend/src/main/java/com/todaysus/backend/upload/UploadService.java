@@ -28,6 +28,9 @@ public class UploadService {
         Photo photo = createPlaceholderPhoto(1L); // TODO: 나중에 auth에서 userId 뽑기
         photo.setFilename(req.filename());
         photo.setContentType(req.contentType());
+        photo.setName(req.name());
+        photo.setLocation(req.location());
+        photo.setDescription(req.description());
         String key = buildOriginalKey(photo.getUserId(), photo.getId());
         photo.setOriginalKey(key);
         photoRepository.save(photo);

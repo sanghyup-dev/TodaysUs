@@ -30,7 +30,10 @@ public class UploadController {
     // DTO
     public record PresignRequest(
             String filename,
-            String contentType
+            String contentType,
+            String name,
+            String location,
+            String description
     ) {
     }
 
