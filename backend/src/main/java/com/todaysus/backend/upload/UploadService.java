@@ -28,7 +28,7 @@ public class UploadService {
         Photo photo = createPlaceholderPhoto(1L); // TODO: 나중에 auth에서 userId 뽑기
         photo.setFilename(req.filename());
         photo.setContentType(req.contentType());
-        photo.setName(req.name());
+        photo.setName(resolveName(req));
         photo.setLocation(req.location());
         photo.setDescription(req.description());
         String key = buildOriginalKey(photo.getUserId(), photo.getId());
@@ -44,6 +44,21 @@ public class UploadService {
     @Transactional
     public void handleUploadComplete(Long photoId) {
         thumbnailService.generateThumbnailAsync(photoId);
+    }
+
+    private String resolveName(PresignRequest req) {
+        if (req.name() != null && !req.name().isBlank()) {
+            return req.name();
+        }
+        if (req.filename() == null || req.filename().isBlank()) {
+            return null;
+        }
+        String filename = req.filename();
+        int dotIndex = filename.lastIndexOf('.');
+        if (dotIndex > 0) {
+            return filename.substring(0, dotIndex);
+        }
+        return filename;
     }
 
     private Photo createPlaceholderPhoto(Long userId) {

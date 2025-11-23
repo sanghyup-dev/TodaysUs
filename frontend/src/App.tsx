@@ -64,6 +64,7 @@ function App() {
   const [zoom, setZoom] = useState(1);
   const [offset, setOffset] = useState({ x: 0, y: 0 });
   const [isPanning, setIsPanning] = useState(false);
+  const [showDescription, setShowDescription] = useState(false);
   const panStartRef = useRef({ x: 0, y: 0, offsetX: 0, offsetY: 0 });
   const sentinelRef = useRef<HTMLDivElement | null>(null);
 
@@ -332,7 +333,6 @@ function App() {
                 <p className="photo-date">
                   {photo.createdAt ? dateFormatter.format(new Date(photo.createdAt)) : '기록 없음'}
                 </p>
-                {photo.description && <p className="photo-description">{photo.description}</p>}
               </div>
             </article>
           );
@@ -344,6 +344,7 @@ function App() {
 
   useEffect(() => {
     resetZoom();
+    setShowDescription(false);
   }, [resetZoom, selectedPhoto]);
 
   useEffect(() => {
@@ -453,10 +454,21 @@ function App() {
                     : '기록 없음'}
                 </p>
                 {selectedPhoto.description && (
-                  <p className="photo-description modal-description">{selectedPhoto.description}</p>
+                  showDescription && (
+                    <p className="photo-description modal-description">{selectedPhoto.description}</p>
+                  )
                 )}
               </div>
               <div className="modal-actions">
+                {selectedPhoto.description && (
+                  <button
+                    className="ghost-button"
+                    type="button"
+                    onClick={() => setShowDescription((prev) => !prev)}
+                  >
+                    {showDescription ? '설명 숨기기' : '설명 보기'}
+                  </button>
+                )}
                 <button
                   className="primary-button"
                   type="button"
