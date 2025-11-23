@@ -3,9 +3,10 @@ package com.todaysus.backend.photo;
 import com.todaysus.backend.config.S3Properties;
 import jakarta.transaction.Transactional;
 import java.time.Duration;
-import java.util.List;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import software.amazon.awssdk.services.s3.S3Client;
 import software.amazon.awssdk.services.s3.model.DeleteObjectRequest;
@@ -22,8 +23,8 @@ public class PhotoService {
     private final S3Properties s3Properties;
     private final S3Client s3Client;
 
-    public List<PhotoResponse> listUserPhotos(Long userId) {
-        return photoRepository.findByUserIdOrderByCreatedAtDesc(userId).stream()
+    public Page<PhotoResponse> listUserPhotos(Long userId, Pageable pageable) {
+        return photoRepository.findByUserId(userId, pageable)
                 .map(photo -> new PhotoResponse(
                         photo.getId(),
                         photo.getName(),
@@ -34,8 +35,7 @@ public class PhotoService {
                         photo.getCreatedAt(),
                         buildThumbnailUrl(photo),
                         buildOriginalUrl(photo)
-                ))
-                .toList();
+                ));
     }
 
     private String buildThumbnailUrl(Photo photo) {

@@ -30,6 +30,12 @@ type Photo = {
   originalImageUrl?: string | null;
 };
 
+type PhotoPage = {
+  content: Photo[];
+  last: boolean;
+  number: number;
+};
+
 const defaultContentType = 'application/octet-stream';
 const dateFormatter = new Intl.DateTimeFormat('ko-KR', {
   year: 'numeric',
@@ -37,6 +43,7 @@ const dateFormatter = new Intl.DateTimeFormat('ko-KR', {
   day: 'numeric',
 });
 const MAX_ZOOM = 10;
+const PAGE_SIZE = 15;
 
 function App() {
   const userId = 1;
@@ -44,6 +51,9 @@ function App() {
   const [photos, setPhotos] = useState<Photo[]>([]);
   const [galleryError, setGalleryError] = useState<string | null>(null);
   const [isGalleryLoading, setIsGalleryLoading] = useState(true);
+  const [isLoadingMore, setIsLoadingMore] = useState(false);
+  const [page, setPage] = useState(0);
+  const [hasMore, setHasMore] = useState(true);
   const [selectedPhoto, setSelectedPhoto] = useState<Photo | null>(null);
   const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
@@ -55,24 +65,54 @@ function App() {
   const [offset, setOffset] = useState({ x: 0, y: 0 });
   const [isPanning, setIsPanning] = useState(false);
   const panStartRef = useRef({ x: 0, y: 0, offsetX: 0, offsetY: 0 });
+  const sentinelRef = useRef<HTMLDivElement | null>(null);
 
-  const fetchPhotos = useCallback(async () => {
+  const loadPhotos = useCallback(async (pageToLoad: number, append: boolean) => {
     try {
-      setIsGalleryLoading(true);
-      const { data } = await axios.get<Photo[]>(`/api/users/${userId}/photos`);
-      setPhotos(data);
+      if (pageToLoad === 0 && !append) {
+        setIsGalleryLoading(true);
+      } else {
+        setIsLoadingMore(true);
+      }
+
+      const { data } = await axios.get<PhotoPage>(`/api/users/${userId}/photos`, {
+        params: { page: pageToLoad, size: PAGE_SIZE },
+      });
+
+      setPhotos((prev) => (append ? [...prev, ...data.content] : data.content));
+      setHasMore(!data.last);
+      setPage(data.number);
       setGalleryError(null);
     } catch (error) {
       console.error('Failed to load photos', error);
       setGalleryError('사진 목록을 불러오지 못했어요. 잠시 후 다시 시도해 주세요.');
     } finally {
       setIsGalleryLoading(false);
+      setIsLoadingMore(false);
     }
-  }, []);
+  }, [userId]);
 
   useEffect(() => {
-    fetchPhotos();
-  }, [fetchPhotos]);
+    loadPhotos(0, false);
+  }, [loadPhotos]);
+
+  useEffect(() => {
+    const sentinel = sentinelRef.current;
+    if (!sentinel) return;
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0].isIntersecting && hasMore && !isGalleryLoading && !isLoadingMore) {
+          loadPhotos(page + 1, true);
+        }
+      },
+      { rootMargin: '200px' }
+    );
+
+    observer.observe(sentinel);
+
+    return () => observer.disconnect();
+  }, [hasMore, isGalleryLoading, isLoadingMore, loadPhotos, page]);
 
   const handleFileChange = async (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -107,7 +147,7 @@ function App() {
       await axios.post(`/api/upload/${data.photoId}/complete`);
 
       alert('업로드가 완료됐어요!');
-      await fetchPhotos();
+      await loadPhotos(0, false);
       setNameInput('');
       setLocationInput('');
       setDescriptionInput('');
@@ -297,6 +337,7 @@ function App() {
             </article>
           );
         })}
+        <div ref={sentinelRef} className="sentinel" aria-hidden />
       </div>
     );
   }, [galleryError, handleKeyOpen, isGalleryLoading, photos]);
@@ -348,11 +389,12 @@ function App() {
             <h2>내 사진 보관함</h2>
             <p className="gallery-subtitle">업로드된 순서대로 최신 사진이 먼저 보여요.</p>
           </div>
-          <button className="ghost-button" type="button" onClick={fetchPhotos} disabled={isGalleryLoading}>
+          <button className="ghost-button" type="button" onClick={() => loadPhotos(0, false)} disabled={isGalleryLoading}>
             새로고침
           </button>
         </header>
         {galleryContent}
+        {isLoadingMore && <div className="gallery-placeholder subtle">더 불러오는 중…</div>}
       </section>
 
       {selectedPhoto && (

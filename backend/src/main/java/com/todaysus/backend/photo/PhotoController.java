@@ -1,6 +1,5 @@
 package com.todaysus.backend.photo;
 
-import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -9,6 +8,10 @@ import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.bind.annotation.ResponseStatus;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Sort;
+import org.springframework.data.web.PageableDefault;
 
 @RestController
 @RequestMapping("/users/{userId}/photos")
@@ -18,8 +21,11 @@ public class PhotoController {
     private final PhotoService photoService;
 
     @GetMapping
-    public List<PhotoResponse> list(@PathVariable Long userId) {
-        return photoService.listUserPhotos(userId);
+    public Page<PhotoResponse> list(
+            @PathVariable Long userId,
+            @PageableDefault(size = 15, sort = "createdAt", direction = Sort.Direction.DESC) Pageable pageable
+    ) {
+        return photoService.listUserPhotos(userId, pageable);
     }
 
     @DeleteMapping("/{photoId}")
