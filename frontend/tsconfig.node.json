@@ -6,7 +6,9 @@
     "moduleResolution": "Bundler",
     "resolveJsonModule": true,
     "isolatedModules": true,
-    "noEmit": true
+    "emitDeclarationOnly": true,
+    "declaration": true,
+    "outDir": "./node_modules/.vite-ts"
   },
   "include": ["vite.config.ts"]
 }
