@@ -10,6 +10,7 @@ public record PhotoResponse(
         String filename,
         String contentType,
         Instant createdAt,
-        String imageUrl
+        String imageUrl,
+        String originalImageUrl
 ) {
 }

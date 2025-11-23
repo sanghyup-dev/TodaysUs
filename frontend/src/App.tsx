@@ -1,4 +1,14 @@
-import { ChangeEvent, useCallback, useEffect, useMemo, useState } from 'react';
+import {
+  ChangeEvent,
+  KeyboardEvent,
+  MouseEvent,
+  WheelEvent,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
 import axios from 'axios';
 import './App.css';
 
@@ -17,6 +27,7 @@ type Photo = {
   contentType?: string | null;
   createdAt?: string | null;
   imageUrl?: string | null;
+  originalImageUrl?: string | null;
 };
 
 const defaultContentType = 'application/octet-stream';
@@ -25,17 +36,26 @@ const dateFormatter = new Intl.DateTimeFormat('ko-KR', {
   month: 'short',
   day: 'numeric',
 });
+const MAX_ZOOM = 10;
 
 function App() {
+  const userId = 1;
   const [isUploading, setIsUploading] = useState(false);
   const [photos, setPhotos] = useState<Photo[]>([]);
   const [galleryError, setGalleryError] = useState<string | null>(null);
   const [isGalleryLoading, setIsGalleryLoading] = useState(true);
+  const [selectedPhoto, setSelectedPhoto] = useState<Photo | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [isDownloading, setIsDownloading] = useState(false);
+  const [zoom, setZoom] = useState(1);
+  const [offset, setOffset] = useState({ x: 0, y: 0 });
+  const [isPanning, setIsPanning] = useState(false);
+  const panStartRef = useRef({ x: 0, y: 0, offsetX: 0, offsetY: 0 });
 
   const fetchPhotos = useCallback(async () => {
     try {
       setIsGalleryLoading(true);
-      const { data } = await axios.get<Photo[]>('/api/users/1/photos');
+      const { data } = await axios.get<Photo[]>(`/api/users/${userId}/photos`);
       setPhotos(data);
       setGalleryError(null);
     } catch (error) {
@@ -94,6 +114,130 @@ function App() {
     }
   };
 
+  const handleDeletePhoto = async (photo: Photo) => {
+    if (!photo.id || isDeleting) {
+      return;
+    }
+
+    const confirmDelete = window.confirm('정말 이 사진을 삭제할까요?');
+    if (!confirmDelete) {
+      return;
+    }
+
+    setIsDeleting(true);
+    try {
+      await axios.delete(`/api/users/${userId}/photos/${photo.id}`);
+      setPhotos((prev) => prev.filter((p) => p.id !== photo.id));
+      setSelectedPhoto(null);
+    } catch (error) {
+      console.error('Failed to delete photo', error);
+      alert('사진 삭제에 실패했어요. 잠시 후 다시 시도해 주세요.');
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
+  const handleKeyOpen = useCallback((event: KeyboardEvent<HTMLElement>, photo: Photo) => {
+    if (event.key === 'Enter' || event.key === ' ') {
+      event.preventDefault();
+      setSelectedPhoto(photo);
+    }
+  }, []);
+
+  const clampZoom = (value: number) => Math.min(MAX_ZOOM, Math.max(1, value));
+
+  const handleZoomChange = useCallback((delta: number) => {
+    setZoom((prev) => {
+      const next = clampZoom(prev + delta);
+      if (next === 1) {
+        setOffset({ x: 0, y: 0 });
+      }
+      return next;
+    });
+  }, []);
+
+  const resetZoom = useCallback(() => {
+    setZoom(1);
+    setOffset({ x: 0, y: 0 });
+  }, []);
+
+  const handleWheelZoom = useCallback(
+    (event: WheelEvent<HTMLDivElement>) => {
+      if (!event.ctrlKey) {
+        return;
+      }
+      event.preventDefault();
+      const delta = event.deltaY > 0 ? -0.2 : 0.2;
+      handleZoomChange(delta);
+    },
+    [handleZoomChange]
+  );
+
+  const startPan = useCallback(
+    (event: MouseEvent<HTMLDivElement>) => {
+      if (zoom <= 1) {
+        return;
+      }
+      setIsPanning(true);
+      panStartRef.current = {
+        x: event.clientX,
+        y: event.clientY,
+        offsetX: offset.x,
+        offsetY: offset.y,
+      };
+    },
+    [offset.x, offset.y, zoom]
+  );
+
+  const handlePanMove = useCallback(
+    (event: MouseEvent<HTMLDivElement>) => {
+      if (!isPanning) {
+        return;
+      }
+      const dx = event.clientX - panStartRef.current.x;
+      const dy = event.clientY - panStartRef.current.y;
+      setOffset({
+        x: panStartRef.current.offsetX + dx,
+        y: panStartRef.current.offsetY + dy,
+      });
+    },
+    [isPanning]
+  );
+
+  const endPan = useCallback(() => {
+    setIsPanning(false);
+  }, []);
+
+  const handleDownload = useCallback(async (photo: Photo) => {
+    const url = photo.originalImageUrl || photo.imageUrl;
+    if (!url) {
+      alert('다운로드할 원본 이미지가 없어요.');
+      return;
+    }
+
+    setIsDownloading(true);
+    try {
+      const response = await fetch(url);
+      if (!response.ok) {
+        throw new Error(`Failed to fetch image: ${response.status}`);
+      }
+      const blob = await response.blob();
+      const downloadUrl = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = downloadUrl;
+      link.download = photo.filename || `photo-${photo.id}`;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      URL.revokeObjectURL(downloadUrl);
+    } catch (error) {
+      console.error('Download failed', error);
+      alert('다운로드에 실패했어요. 잠시 후 다시 시도해 주세요.');
+    } finally {
+      setIsDownloading(false);
+    }
+  }, []);
+
   const galleryContent = useMemo(() => {
     if (isGalleryLoading) {
       return <div className="gallery-placeholder">사진을 불러오는 중입니다…</div>;
@@ -116,7 +260,14 @@ function App() {
         {photos.map((photo) => {
           const fallbackLabel = photo.name || photo.filename || `사진 #${photo.id}`;
           return (
-            <article className="photo-card" key={photo.id}>
+            <article
+              className="photo-card"
+              key={photo.id}
+              role="button"
+              tabIndex={0}
+              onClick={() => setSelectedPhoto(photo)}
+              onKeyDown={(event) => handleKeyOpen(event, photo)}
+            >
               {photo.imageUrl ? (
                 <img src={photo.imageUrl} alt={fallbackLabel} loading="lazy" />
               ) : (
@@ -137,7 +288,33 @@ function App() {
         })}
       </div>
     );
-  }, [galleryError, isGalleryLoading, photos]);
+  }, [galleryError, handleKeyOpen, isGalleryLoading, photos]);
+
+  useEffect(() => {
+    resetZoom();
+  }, [resetZoom, selectedPhoto]);
+
+  useEffect(() => {
+    if (!selectedPhoto) {
+      document.body.style.overflow = '';
+      return;
+    }
+
+    document.body.style.overflow = 'hidden';
+
+    const handleGlobalWheel = (event: WheelEvent) => {
+      if (event.ctrlKey) {
+        event.preventDefault();
+      }
+    };
+
+    window.addEventListener('wheel', handleGlobalWheel, { passive: false });
+
+    return () => {
+      document.body.style.overflow = '';
+      window.removeEventListener('wheel', handleGlobalWheel);
+    };
+  }, [selectedPhoto]);
 
   return (
     <main className="app">
@@ -172,6 +349,88 @@ function App() {
         </header>
         {galleryContent}
       </section>
+
+      {selectedPhoto && (
+        <div className="modal-backdrop" onClick={() => setSelectedPhoto(null)}>
+          <div className="modal" onClick={(event) => event.stopPropagation()}>
+            <button className="close-button" onClick={() => setSelectedPhoto(null)} aria-label="닫기">
+              X
+            </button>
+            <div
+              className={`modal-image-wrapper ${isPanning ? 'panning' : ''}`}
+              onMouseDown={startPan}
+              onMouseMove={handlePanMove}
+              onMouseUp={endPan}
+              onMouseLeave={endPan}
+              onWheel={handleWheelZoom}
+            >
+              {selectedPhoto.originalImageUrl || selectedPhoto.imageUrl ? (
+                <div
+                  className="modal-image-inner"
+                  style={{
+                    transform: `translate(${offset.x}px, ${offset.y}px) scale(${zoom})`,
+                    transformOrigin: 'center center',
+                    cursor: zoom > 1 ? 'grab' : 'default',
+                  }}
+                >
+                  <img
+                    src={selectedPhoto.originalImageUrl || selectedPhoto.imageUrl || ''}
+                    alt={selectedPhoto.name || selectedPhoto.filename || `사진 #${selectedPhoto.id}`}
+                    draggable={false}
+                  />
+                </div>
+              ) : (
+                <div className="photo-fallback modal-fallback">
+                  원본 이미지를 준비하는 중이에요.
+                </div>
+              )}
+              <div className="zoom-controls">
+                <button type="button" onClick={() => handleZoomChange(-0.2)} disabled={zoom <= 1.01}>
+                  -
+                </button>
+                <span className="zoom-level">{Math.round(zoom * 100)}%</span>
+                <button type="button" onClick={() => handleZoomChange(0.2)} disabled={zoom >= MAX_ZOOM - 0.01}>
+                  +
+                </button>
+              </div>
+            </div>
+            <div className="modal-meta">
+              <div>
+                <p className="photo-title">
+                  {selectedPhoto.name || selectedPhoto.filename || `사진 #${selectedPhoto.id}`}
+                </p>
+                {selectedPhoto.location && <p className="photo-location">{selectedPhoto.location}</p>}
+                <p className="photo-date">
+                  {selectedPhoto.createdAt
+                    ? dateFormatter.format(new Date(selectedPhoto.createdAt))
+                    : '기록 없음'}
+                </p>
+                {selectedPhoto.description && (
+                  <p className="photo-description modal-description">{selectedPhoto.description}</p>
+                )}
+              </div>
+              <div className="modal-actions">
+                <button
+                  className="primary-button"
+                  type="button"
+                  onClick={() => handleDownload(selectedPhoto)}
+                  disabled={isDownloading || !(selectedPhoto.originalImageUrl || selectedPhoto.imageUrl)}
+                >
+                  {isDownloading ? '다운로드 중…' : '다운로드'}
+                </button>
+                <button
+                  className="danger-button"
+                  type="button"
+                  onClick={() => handleDeletePhoto(selectedPhoto)}
+                  disabled={isDeleting}
+                >
+                  {isDeleting ? '삭제 중…' : '삭제'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </main>
   );
 }
