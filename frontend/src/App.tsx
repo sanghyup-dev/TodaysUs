@@ -377,7 +377,7 @@ function App() {
 
     document.body.style.overflow = 'hidden';
 
-    const handleGlobalWheel = (event: WheelEvent) => {
+    const handleGlobalWheel = (event: globalThis.WheelEvent) => {
       if (event.ctrlKey) {
         event.preventDefault();
       }
