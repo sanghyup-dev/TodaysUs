@@ -12,6 +12,20 @@ import {
 import axios from 'axios';
 import './App.css';
 
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? '';
+
+const apiClient = axios.create({
+  // 배포 환경(Render Static Site)에서는 baseURL에 백엔드 도메인을 넣어줄 거고,
+  // 로컬 개발에서는 env를 비워두면 (''), 기존처럼 /api/... 로 호출됨.
+  baseURL: API_BASE_URL || undefined,
+});
+
+// dev에서는 /api/users/...로 보내고,
+// prod에서는 /users/...로 보내야 하니까,
+// baseURL이 설정된 경우에만 /api 프리픽스를 잘라주는 헬퍼.
+const apiPath = (path: string) =>
+  API_BASE_URL ? path.replace(/^\/api/, '') : path;
+
 type PresignResponse = {
   photoId: number;
   key: string;
@@ -76,9 +90,12 @@ function App() {
         setIsLoadingMore(true);
       }
 
-      const { data } = await axios.get<PhotoPage>(`/api/users/${userId}/photos`, {
-        params: { page: pageToLoad, size: PAGE_SIZE },
-      });
+      const { data } = await apiClient.get<PhotoPage>(
+        apiPath(`/api/users/${userId}/photos`),
+        {
+          params: { page: pageToLoad, size: PAGE_SIZE },
+        }
+      );
 
       setPhotos((prev) => (append ? [...prev, ...data.content] : data.content));
       setHasMore(!data.last);
@@ -125,13 +142,16 @@ function App() {
     setIsUploading(true);
 
     try {
-      const { data } = await axios.post<PresignResponse>('/api/upload/init', {
-        filename: file.name,
-        contentType,
-        name: nameInput || null,
-        location: locationInput || null,
-        description: descriptionInput || null,
-      });
+      const { data } = await apiClient.post<PresignResponse>(
+        apiPath('/api/upload/init'),
+        {
+          filename: file.name,
+          contentType,
+          name: nameInput || null,
+          location: locationInput || null,
+          description: descriptionInput || null,
+        }
+      );
 
       const putResponse = await fetch(data.url, {
         method: 'PUT',
@@ -145,7 +165,7 @@ function App() {
         throw new Error(`Upload failed with status ${putResponse.status}`);
       }
 
-      await axios.post(`/api/upload/${data.photoId}/complete`);
+      await apiClient.post(apiPath(`/api/upload/${data.photoId}/complete`));
 
       alert('업로드가 완료됐어요!');
       await loadPhotos(0, false);
@@ -178,7 +198,9 @@ function App() {
 
     setIsDeleting(true);
     try {
-      await axios.delete(`/api/users/${userId}/photos/${photo.id}`);
+      await apiClient.delete(
+        apiPath(`/api/users/${userId}/photos/${photo.id}`)
+      );
       setPhotos((prev) => prev.filter((p) => p.id !== photo.id));
       setSelectedPhoto(null);
     } catch (error) {
