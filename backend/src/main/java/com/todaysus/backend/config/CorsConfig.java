@@ -12,7 +12,7 @@ public class CorsConfig implements WebMvcConfigurer {
         registry.addMapping("/**")
                 .allowedOrigins(
                         "http://localhost:5173",
-                        "https://todaysus-serverbased-frontend.onrender.com"
+                        "https://todaysus-serverbased-frontend.onrender.com",
                         "https://todaysus.my/"
                 )
                 .allowedMethods("GET", "POST", "PUT", "DELETE", "OPTIONS")
